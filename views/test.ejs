@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title></title>
+    <link rel='stylesheet' href='/stylesheets/style.css' />
+    <style type="text/css">
+      .tg  {border-collapse:collapse;border-spacing:0;}
+      .tg td{border-color:black;border-style:solid;border-width:1px;font-family:Arial, sans-serif;font-size:14px;
+        overflow:hidden;padding:10px 5px;word-break:normal;}
+      .tg th{border-color:black;border-style:solid;border-width:1px;font-family:Arial, sans-serif;font-size:14px;
+        font-weight:normal;overflow:hidden;padding:10px 5px;word-break:normal;}
+      .tg .tg-0pky{border-color:inherit;text-align:left;vertical-align:top}
+
+      .innercell {
+        font-weight: bolder;
+      }
+      </style>      
+  </head>
+  <body id = "body">
+    <h1>MySearchEngine</h1>        
+    <% test = JSON.parse(file_setting) %>
+    <table class="tg">
+      <tr>
+        <td>
+          <button id="ajaxBack" type="button">←</button>    
+          <button id="ajaxUpper" type="button">↑</button>    
+        </td>
+        <td>
+          Current_directory
+        </td>
+        <td>          
+          <div id = 'directory'><%= test['cur_location'] %></div>
+        </td>
+      </tr>
+    </table>    
+      <% for (var j = 0; j < 1; j++){ %>     
+    <h1>Current Directory File List</h1>
+    <table id="cur_location">                                    
+        <% for (var i = 0; i < test[Object.keys(test)[j]].length; i++){ %>          
+      <tr>
+        <td>
+        <%=(test[Object.keys(test)[j]][i])%>
+        </td>
+      </tr>            
+        <% } %>      
+    </table>
+      <% } %>        
+    <script>
+      (function() {        
+        var visit_history = [];
+        var location_save = "";        
+        var httpRequest;
+        document.getElementById("ajaxUpper").addEventListener('click', function(){makeRequest("upper")}, false);
+        document.getElementById("ajaxBack").addEventListener('click', function(){makeRequest("back")}, false);
+
+        function makeRequest(direction) {                
+          httpRequest = new XMLHttpRequest();
+          if (!httpRequest) {
+            alert('Giving up :( Cannot create an XMLHTTP instance');
+            return false;
+          }                              
+          httpRequest.onreadystatechange = function(){
+            alertContents(direction)
+          };                              
+          var temp = <%- file_setting %>;                    
+          if (location_save == ""){
+            location_save = temp['cur_location'] 
+            visit_history.push(location_save);              
+          }                    
+          location_save = encodeURIComponent(location_save)
+          httpRequest.open('POST', '/ajaxtest');      
+          httpRequest.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded; charset=UTF-8');
+          if (direction=="upper" | direction==undefined){    
+            visit_history.push(location_save)
+            httpRequest.setRequestHeader('current_location', location_save); 
+            httpRequest.setRequestHeader('direction', "upper");             
+          } else if (direction =="back"){
+            httpRequest.setRequestHeader('direction', "back"); 
+            console.log(visit_history)
+            if (visit_history.length >1){              
+              httpRequest.setRequestHeader('current_location', visit_history.pop()); 
+            } else {
+              httpRequest.setRequestHeader('current_location', visit_history[0]); 
+            }            
+          } else if (direction == "direct"){            
+            httpRequest.setRequestHeader('current_location', location_save); 
+            httpRequest.setRequestHeader('direction', "direct");             
+          }      
+          if (document.getElementById('showimg') != null){
+            //clear popuped image
+            document.getElementById('showimg').src = " ";                  
+          }                  
+          console.log(visit_history)                    
+          httpRequest.send();                    
+        }
+
+        function alertContents(direction) {                       
+          if (httpRequest.readyState === XMLHttpRequest.DONE) {
+            if (httpRequest.status === 200) {                                                         
+              var temp = JSON.parse(JSON.parse(httpRequest.responseText)['file_setting']);              
+              var cur = document.getElementById("cur_location");   
+              cur.innerHTML = "";                            
+              for (var i=0; i< temp["cur"].length; i++){                
+                var row = cur.insertRow(i);                             
+                if (temp["cur"][i].indexOf('.')!=-1){                  
+                  row.addEventListener('click', function(event){   
+                    file_nm = event.target.innerHTML;
+                    streamRequest("png")                    
+                  }, false);
+                  row.insertCell(0).innerHTML = "<div class='innercell'>"+temp["cur"][i]+'</div>';                                                              
+                } else {
+                  row.addEventListener('click', function(event){
+                    visit_history.push(location_save)
+                    location_save = location_save + "\\" + event.target.innerHTML;                                        
+                    makeRequest("direct")                    
+                  }, false);
+                  row.insertCell(0).innerHTML = "<div class='innercell'>"+temp["cur"][i]+'</div>';                
+                }                
+              };              
+              location_save = temp['cur_location']                                       
+              document.getElementById('directory').innerHTML = location_save;                             
+            } else {
+              alert('There was a problem with the request.');
+            }
+          }
+        }
+
+        var file_nm;
+        function streamRequest(file_format) {               
+          httpRequest = new XMLHttpRequest();
+          if (!httpRequest) {
+            alert('Giving up :( Cannot create an XMLHTTP instance');
+            return false;
+          }                                        
+          httpRequest.onreadystatechange = function(){
+            streamContents(file_format)
+          };                                                                        
+          httpRequest.open('POST', '/ajaxstream');      
+          httpRequest.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded; charset=UTF-8');
+          httpRequest.setRequestHeader("current_location",location_save)          
+          httpRequest.setRequestHeader("req_file",file_nm)          
+          httpRequest.send();                    
+        }
+        var img = document.createElement('img');
+        img.id = "showimg"
+        function streamContents(file_format){
+          if (httpRequest.readyState === XMLHttpRequest.DONE) {
+            if (httpRequest.status === 200) {                     
+              img.src = 'data:image/jpg;base64,' + httpRequest.responseText.toString("Base64")              
+              document.getElementById('body').appendChild(img);              
+            } else {
+              alert('There was a problem with the request.');
+            }
+          }
+        }
+      })();
+    </script>
+  </body>
+</html>
